@@ -1,13 +1,14 @@
+from lib2to3.pgen2 import token
 from nltk import word_tokenize, pos_tag
 import copy
+from random import randint
 
-# Ehsan Shaghaei
-# B19-AAI01
-#
+# @ author Ehsan Shaghaei
+# ehsan2754@gmail.com
 
 TEXT = ['Cat template has properties of color, age, and name.',
         'There exists a cat with the name Bob.',
-        'If there exists cat named Bob then there exists a cat named Tom.']
+        'If there exists cat named Bob aged 12 then there exists a cat named Tom aged 12.']
 
 
 class EnglishToClips:
@@ -18,7 +19,7 @@ class EnglishToClips:
 
     ALLOWED_POS = ['IN', 'RB', 'VBZ', 'NN', '.']
     ASSERT_CORPUS = ['exists', 'exist', ]
-    DEFTEMPLEATE_CORPUS = ['has', 'contains']
+    DEFTEMPLEATE_CORPUS = ['has', 'contains','template']
 
     def __init__(self, sentences: str):
         self.sentences = filter(lambda x: x, sentences.split('.'))
@@ -30,6 +31,7 @@ class EnglishToClips:
         ct = copy.deepcopy(self.cmd_types)
         fp = list(map(list, fp))
         ct = list(ct)
+        self.ruleSeed=0
         print(*list(map(lambda x: self._parseCMD(*x), zip(fp, ct))),sep='\n')
 
     def filterPosTags(self, postag, allwoedtags=ALLOWED_POS):
@@ -55,15 +57,21 @@ class EnglishToClips:
     def _parseCMD(self, postag, cmd_type: int) -> str:
         if cmd_type == self.CMD.DEFRULE:
             tmp = copy.deepcopy(list(map(list,self.filterPosTags(postag, ['NN','VBZ','RB']))))
-            tmp = tmp[:],
-            return ' '.join(map(str,tmp))
+            tags = [pair[1] for pair in tmp if pair[1] != 'VBZ']  
+            tokens = [pair[0] for pair in tmp if pair[1] != 'VBZ']  
+            cond,resp = list(set(tokens[:tags.index('RB')])),list(set(tokens[tags.index('RB')+1:]))
+            self.ruleSeed+=1
+            return f'(defrule rule{self.ruleSeed} ({cond[0]}({", ".join(cond[1:])}))) => (assert ({resp[0]}({", ".join(resp[1:])})))'
         elif cmd_type == self.CMD.DEFTEMPLATE:
-            tmp = copy.deepcopy(list(map(list,self.filterPosTags(postag, ['NN','VBZ']))))
-            
-            return ' '.join(map(str,tmp))
+            tmp = copy.deepcopy(list(map(list,self.filterPosTags(postag, ['NN','VBZ','RB']))))
+            tags = [pair[1] for pair in tmp if (pair[1] == 'NN') and (pair[0] not in self.DEFTEMPLEATE_CORPUS)]  
+            tokens = [pair[0] for pair in tmp if (pair[1] == 'NN') and (pair[0] not in self.DEFTEMPLEATE_CORPUS)] 
+            return f'(deftemplate {tokens[0]} {" ".join([f"(slot {slot})" for slot in tokens[1:]])})'
         elif cmd_type == self.CMD.ASSERT:
-            tmp = copy.deepcopy(list(map(list,self.filterPosTags(postag, ['NN','RB']))))
-            return ' '.join(map(str,tmp))
+            tmp = copy.deepcopy(list(map(list,self.filterPosTags(postag, ['NN']))))
+            tags = [pair[1] for pair in tmp if (pair[1] == 'NN') and (pair[0] not in self.DEFTEMPLEATE_CORPUS)]  
+            tokens = [pair[0] for pair in tmp if (pair[1] == 'NN') and (pair[0] not in self.DEFTEMPLEATE_CORPUS)] 
+            return f'(assert ({tokens[0]} {" ".join([f"({key} ``{value}``)" for key,value in zip(tokens[1::2],tokens[2::2])])}))'
 
 
 if __name__ == '__main__':
